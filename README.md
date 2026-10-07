@@ -2,6 +2,8 @@
 
 > AI-Powered Secure Document Vault — Store, Share, and Manage documents with Gemini AI intelligence.
 
+**🔗 Live Demo:** [https://trustvaultai.vercel.app](https://trustvaultai.vercel.app)
+
 ![React Native](https://img.shields.io/badge/React_Native-0.86-blue?logo=react)
 ![Expo](https://img.shields.io/badge/Expo-57-black?logo=expo)
 ![Express.js](https://img.shields.io/badge/Express-5.x-green?logo=express)
