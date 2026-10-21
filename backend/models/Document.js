@@ -39,7 +39,11 @@ const documentSchema = new mongoose.Schema({
   },
   publicId: {
     type: String,
-    required: true
+    default: ''        // not required — populated by Cloudinary or local mode
+  },
+  fileData: {
+    type: String,
+    select: false      // heavy field — excluded from normal queries
   },
   fileType: {
     type: String,

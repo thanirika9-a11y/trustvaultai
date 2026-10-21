@@ -22,10 +22,10 @@ const uploadDocument = async (req, res, next) => {
       return res.status(409).json({ success: false, message: 'A document with this title already exists. Please use a different name.', code: 'DUPLICATE_DOC' });
     }
 
-    // Upload to Cloudinary (or local simulation)
+    // Upload to Cloudinary (or Base64 fallback)
     const result = await cloudinaryService.uploadToCloudinary(req.file.buffer, 'trustvault/documents', req.file.originalname);
 
-    // Run AI Analysis for Tamil summary and Smart Deadlines / Expiry
+    // Run AI Analysis
     const aiAnalysis = await aiService.analyzeDocument(req.file.buffer, req.file.mimetype, title, category);
     const summaryText = typeof aiAnalysis === 'string' ? aiAnalysis : (aiAnalysis.summary || '');
     const expiryDate = aiAnalysis.expiryDate || null;
@@ -34,13 +34,24 @@ const uploadDocument = async (req, res, next) => {
     const reminderType = aiAnalysis.reminderType || null;
     const reminderNote = aiAnalysis.reminderNote || null;
 
+    // Determine fileUrl and optional fileData for base64 mode
+    let fileUrl = result.secure_url;
+    let fileData = undefined;
+
+    // If result is a base64 data URI, store it in fileData and use a placeholder view URL
+    if (result.secure_url && result.secure_url.startsWith('data:')) {
+      fileData = result.secure_url;
+      fileUrl = `__base64__`; // placeholder; real content served from fileData via view route
+    }
+
     // Save to DB
     const doc = await Document.create({
       owner: req.user.id,
       title,
       category,
-      fileUrl: result.secure_url,
-      publicId: result.public_id,
+      fileUrl,
+      publicId: result.public_id || '',
+      fileData,
       fileType: req.file.mimetype,
       fileSize: req.file.size,
       aiSummaryTamil: summaryText,
@@ -51,7 +62,7 @@ const uploadDocument = async (req, res, next) => {
       reminderNote
     });
 
-    // If deadline or expiry was detected, fire background notification email
+    // If deadline detected, send email notification
     if (dueDate || expiryDate) {
       const emailService = require('../services/emailService');
       const targetDate = dueDate || expiryDate;
@@ -188,6 +199,25 @@ const viewDocument = async (req, res, next) => {
         };
       } else {
         return res.status(404).send('Document not found');
+      }
+    }
+
+    // ── Base64 mode: fileUrl is placeholder, real data is in fileData ──
+    if (doc && doc.fileUrl === '__base64__') {
+      // Re-fetch with fileData (excluded by default via select: false)
+      const fullDoc = await Document.findById(doc._id).select('+fileData');
+      if (fullDoc && fullDoc.fileData) {
+        const dataUri = fullDoc.fileData;
+        const mimeMatch = dataUri.match(/^data:([^;]+);base64,/);
+        const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        const base64Data = dataUri.split(',')[1];
+        const buffer = Buffer.from(base64Data, 'base64');
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-Length', buffer.length);
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fullDoc.title)}"`);
+        return res.send(buffer);
       }
     }
 
