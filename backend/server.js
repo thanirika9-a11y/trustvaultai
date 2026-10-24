@@ -14,7 +14,19 @@ app.use(helmet({
   crossOriginOpenerPolicy: false,
   contentSecurityPolicy: false
 }));
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://trustvaultai.vercel.app',
+    'https://trustvaultai-mvhdytx4g-thanirikas-projects.vercel.app',
+    /\.vercel\.app$/,          // any Vercel preview URL
+    'http://localhost:8081',
+    'http://localhost:8082',
+    'http://localhost:19006',
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 app.use(morgan('dev'));
